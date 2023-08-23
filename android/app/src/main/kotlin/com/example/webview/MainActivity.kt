@@ -1,4 +1,4 @@
-package com.example.odflutter
+package com.vsoft.certfyremote
 
 import io.flutter.embedding.android.FlutterActivity
 
