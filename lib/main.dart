@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 Future main() async {
@@ -16,7 +18,7 @@ Future main() async {
     statusBarColor: Color.fromRGBO(9, 142, 197, 1), // status bar color
   ));
   if (Platform.isAndroid) {
-    await AndroidInAppWebViewController.setWebContentsDebuggingEnabled(true);
+    await InAppWebViewController.setWebContentsDebuggingEnabled(true);
   }
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -27,70 +29,152 @@ Future main() async {
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
   @override
   MyAppState createState() => MyAppState();
 }
 
 class MyAppState extends State<MyApp> {
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: InAppWebViewPage(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
+  final GlobalKey webViewKey = GlobalKey();
 
-class InAppWebViewPage extends StatefulWidget {
-  const InAppWebViewPage({super.key});
+  InAppWebViewController? webViewController;
+  InAppWebViewSettings settings = InAppWebViewSettings(
+      useShouldOverrideUrlLoading: true,
+      mediaPlaybackRequiresUserGesture: false,
+      allowsInlineMediaPlayback: true,
+      iframeAllow: "camera; microphone",
+      iframeAllowFullscreen: true);
 
-  @override
-  InAppWebViewPageState createState() => InAppWebViewPageState();
-}
-
-class InAppWebViewPageState extends State<InAppWebViewPage> {
-  // ignore: unused_field
-  InAppWebViewController? _webViewController;
-  final initalUrl = URLRequest(
-      url: Uri.parse(
-          "https://app-test2.certfy.tech/onboarding/autoid/fe4ef559-6c9e-4210-b7ae-6c80ece759ef/steps"));
+  PullToRefreshController? pullToRefreshController;
+  String url = "";
+  double progress = 0;
   final urlController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    pullToRefreshController = kIsWeb
+        ? null
+        : PullToRefreshController(
+            settings: PullToRefreshSettings(
+              color: Colors.blue,
+            ),
+            onRefresh: () async {
+              if (defaultTargetPlatform == TargetPlatform.android) {
+                webViewController?.reload();
+              } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+                webViewController?.loadUrl(
+                    urlRequest:
+                        URLRequest(url: await webViewController?.getUrl()));
+              }
+            },
+          );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        body: SafeArea(
-      child: Column(children: <Widget>[
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+          body: SafeArea(
+              child: Column(children: <Widget>[
         TextField(
           decoration: const InputDecoration(prefixIcon: Icon(Icons.search)),
           controller: urlController,
-          keyboardType: TextInputType.text,
+          keyboardType: TextInputType.url,
           onSubmitted: (value) {
-            var url = Uri.parse(value);
+            var url = WebUri(value);
             if (url.scheme.isEmpty) {
-              url = Uri.parse(("https://www.google.com/search?q=") + value);
+              url = WebUri("https://www.google.com/search?q=" + value);
             }
-            _webViewController?.loadUrl(urlRequest: URLRequest(url: url));
+            webViewController?.loadUrl(urlRequest: URLRequest(url: url));
           },
         ),
         Expanded(
-          child: InAppWebView(
-              initialUrlRequest: initalUrl,
-              initialOptions: InAppWebViewGroupOptions(
-                crossPlatform: InAppWebViewOptions(
-                  mediaPlaybackRequiresUserGesture: false,
-                ),
+          child: Stack(
+            children: [
+              InAppWebView(
+                key: webViewKey,
+                initialUrlRequest: URLRequest(
+                    url: WebUri(
+                        "https://app-dev.certfy.tech/onboarding/autoid/86f925f8-b9cb-44d5-938e-e5a238d69bad/steps")),
+                initialSettings: settings,
+                pullToRefreshController: pullToRefreshController,
+                onWebViewCreated: (controller) {
+                  webViewController = controller;
+                },
+                onLoadStart: (controller, url) {
+                  setState(() {
+                    this.url = url.toString();
+                    urlController.text = this.url;
+                  });
+                },
+                onPermissionRequest: (controller, request) async {
+                  return PermissionResponse(
+                      resources: request.resources,
+                      action: PermissionResponseAction.GRANT);
+                },
+                shouldOverrideUrlLoading: (controller, navigationAction) async {
+                  var uri = navigationAction.request.url!;
+
+                  if (![
+                    "http",
+                    "https",
+                    "file",
+                    "chrome",
+                    "data",
+                    "javascript",
+                    "about"
+                  ].contains(uri.scheme)) {
+                    if (await canLaunchUrl(uri)) {
+                      // Launch the App
+                      await launchUrl(
+                        uri,
+                      );
+                      // and cancel the request
+                      return NavigationActionPolicy.CANCEL;
+                    }
+                  }
+
+                  return NavigationActionPolicy.ALLOW;
+                },
+                onLoadStop: (controller, url) async {
+                  pullToRefreshController?.endRefreshing();
+                  setState(() {
+                    this.url = url.toString();
+                    urlController.text = this.url;
+                  });
+                },
+                onReceivedError: (controller, request, error) {
+                  pullToRefreshController?.endRefreshing();
+                },
+                onProgressChanged: (controller, progress) {
+                  if (progress == 100) {
+                    pullToRefreshController?.endRefreshing();
+                  }
+                  setState(() {
+                    this.progress = progress / 100;
+                    urlController.text = url;
+                  });
+                },
+                onUpdateVisitedHistory: (controller, url, androidIsReload) {
+                  setState(() {
+                    this.url = url.toString();
+                    urlController.text = this.url;
+                  });
+                },
+                onConsoleMessage: (controller, consoleMessage) {
+                  print(consoleMessage);
+                },
               ),
-              onWebViewCreated: (InAppWebViewController controller) {
-                _webViewController = controller;
-              },
-              androidOnPermissionRequest: (InAppWebViewController controller,
-                  String origin, List<String> resources) async {
-                return PermissionRequestResponse(
-                    resources: resources,
-                    action: PermissionRequestResponseAction.GRANT);
-              }),
+              progress < 1.0
+                  ? LinearProgressIndicator(value: progress)
+                  : Container(),
+            ],
+          ),
         ),
-      ]),
-    ));
+      ]))),
+    );
   }
 }
