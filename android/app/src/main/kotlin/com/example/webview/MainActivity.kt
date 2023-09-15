@@ -1,4 +1,4 @@
-package com.vsoft.certfyremote
+package com.testvsoft.testcertfyremote
 
 import io.flutter.embedding.android.FlutterActivity
 
