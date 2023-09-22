@@ -98,13 +98,11 @@ class MyAppState extends State<MyApp> {
                 key: webViewKey,
                 initialUrlRequest: URLRequest(
                     url: WebUri(
-                        "https://app-dev.certfy.tech/onboarding/autoid/c873938a-7c34-43a8-9218-66f6b45e3066")),
+                        "https://app-dev.certfy.tech/onboarding/app/queue/94612025-d6f5-4951-91f0-118016d92944")),
                 initialSettings: settings,
                 pullToRefreshController: pullToRefreshController,
                 onWebViewCreated: (controller) {
                   webViewController = controller;
-                  webViewController?.evaluateJavascript(
-                      source: "window.isFlutterWebView = true");
                 },
                 onLoadStart: (controller, url) {
                   setState(() {
@@ -142,6 +140,9 @@ class MyAppState extends State<MyApp> {
                   return NavigationActionPolicy.ALLOW;
                 },
                 onLoadStop: (controller, url) async {
+                  var result = await controller.evaluateJavascript(
+                      source: 'window.isHybridEnviroment = true');
+
                   pullToRefreshController?.endRefreshing();
                   setState(() {
                     this.url = url.toString();
@@ -180,3 +181,4 @@ class MyAppState extends State<MyApp> {
     );
   }
 }
+//https://app-dev.certfy.tech/onboarding/app/queue/94612025-d6f5-4951-91f0-118016d92944
