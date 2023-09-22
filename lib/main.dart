@@ -98,11 +98,13 @@ class MyAppState extends State<MyApp> {
                 key: webViewKey,
                 initialUrlRequest: URLRequest(
                     url: WebUri(
-                        "https://app-dev.certfy.tech/onboarding/autoid/86f925f8-b9cb-44d5-938e-e5a238d69bad/steps")),
+                        "https://app-dev.certfy.tech/onboarding/autoid/c873938a-7c34-43a8-9218-66f6b45e3066")),
                 initialSettings: settings,
                 pullToRefreshController: pullToRefreshController,
                 onWebViewCreated: (controller) {
                   webViewController = controller;
+                  webViewController?.evaluateJavascript(
+                      source: "window.isFlutterWebView = true");
                 },
                 onLoadStart: (controller, url) {
                   setState(() {
@@ -165,7 +167,7 @@ class MyAppState extends State<MyApp> {
                   });
                 },
                 onConsoleMessage: (controller, consoleMessage) {
-                  print(consoleMessage);
+                  // print(consoleMessage.message);
                 },
               ),
               progress < 1.0
