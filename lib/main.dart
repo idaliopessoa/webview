@@ -103,6 +103,8 @@ class MyAppState extends State<MyApp> {
                 pullToRefreshController: pullToRefreshController,
                 onWebViewCreated: (controller) {
                   webViewController = controller;
+                  webViewController?.evaluateJavascript(
+                      source: "window.isFlutterWebView = true");
                 },
                 onLoadStart: (controller, url) {
                   setState(() {
@@ -165,7 +167,7 @@ class MyAppState extends State<MyApp> {
                   });
                 },
                 onConsoleMessage: (controller, consoleMessage) {
-                  print(consoleMessage.message);
+                  // print(consoleMessage.message);
                 },
               ),
               progress < 1.0
